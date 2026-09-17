@@ -56,6 +56,11 @@ export class Tower {
     this.group.add(this._levelPips);
     this._refreshLevelPips();
 
+    this._runeGems = new THREE.Group();
+    this._runeGems.position.y = 0.65;
+    this.group.add(this._runeGems);
+    this.refreshRuneVisual();
+
     // health bar
     const barGroup = new THREE.Group();
     const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.14), new THREE.MeshBasicMaterial({ color: 0x1a1a1a, depthTest: false }));
@@ -97,6 +102,32 @@ export class Tower {
     }
   }
 
+  // Rune slots grow with tower level (1 at lvl 2, 2 at lvl 3-4, 3 at max level).
+  maxRuneSlots() {
+    if (this.level >= MAX_TOWER_LEVEL) return 3;
+    if (this.level >= 3) return 2;
+    if (this.level >= 2) return 1;
+    return 0;
+  }
+
+  refreshRuneVisual() {
+    while (this._runeGems.children.length) {
+      const c = this._runeGems.children.pop();
+      c.geometry.dispose();
+      c.material.dispose();
+    }
+    const radius = 0.55;
+    this.runes.forEach((rune, i) => {
+      const angle = (i / Math.max(1, this.runes.length)) * Math.PI * 2;
+      const gem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.13, 0),
+        new THREE.MeshStandardMaterial({ color: rune.color, emissive: rune.color, emissiveIntensity: 0.7, roughness: 0.2 })
+      );
+      gem.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      this._runeGems.add(gem);
+    });
+  }
+
   effectiveStats(auraFromSupport = null) {
     const def = this.def;
     const lvlMult = levelMultiplier(this.level);
@@ -120,9 +151,11 @@ export class Tower {
     }
 
     for (const rune of this.runes) {
-      if (rune.damageMult) damage *= rune.damageMult;
-      if (rune.rangeMult) range *= rune.rangeMult;
-      if (rune.status) status = rune.status;
+      const fx = rune.effect || rune; // tolerate either the rune def or a bare effect object
+      if (fx.damageMult) damage *= fx.damageMult;
+      if (fx.rangeMult) range *= fx.rangeMult;
+      if (fx.fireRateMult) fireRate *= fx.fireRateMult;
+      if (fx.status) status = fx.status;
     }
 
     if (auraFromSupport) {

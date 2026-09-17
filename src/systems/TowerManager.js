@@ -3,6 +3,7 @@ import { Tower } from '../entities/Tower.js';
 import { TOWER_TYPES, FUSION_REQUIREMENT, MAX_TOWER_LEVEL, upgradeCost } from '../data/towers.js';
 import { Projectile } from '../entities/Projectile.js';
 import { applyStatusToTarget } from './StatusEffects.js';
+import { rollRuneOffer } from '../data/runes.js';
 
 const INVISIBLE_DETECTORS = new Set(['mage', 'control', 'trap']);
 
@@ -94,8 +95,29 @@ export class TowerManager {
     return anchor;
   }
 
-  insertRune(tower, rune) {
+  canAddRune(tower) {
+    return tower.runes.length < tower.maxRuneSlots();
+  }
+
+  getRuneOffer(tower) {
+    if (!this.canAddRune(tower)) return [];
+    return rollRuneOffer(tower.runes.map((r) => r.id), 3);
+  }
+
+  addRune(tower, rune) {
+    if (!this.canAddRune(tower)) return false;
+    if (!this.economy.spendCrystals(rune.cost)) return false;
     tower.runes.push(rune);
+    tower.refreshRuneVisual();
+    this.bus.emit('tower:rune-added', { tower, rune });
+    return true;
+  }
+
+  removeRune(tower, index) {
+    if (index < 0 || index >= tower.runes.length) return false;
+    tower.runes.splice(index, 1);
+    tower.refreshRuneVisual();
+    return true;
   }
 
   applyOvercharge(tower, duration, fireRateMult) {
