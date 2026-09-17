@@ -35,28 +35,117 @@ export class Player {
 
   get stats() { return this.progression.getStats(); }
 
+  // A small stylized hero built from primitives: armored torso, cape, a
+  // sword-and-shield pair on the arms, and a simple walk-cycle rig (legs and
+  // arms swing from hip/shoulder pivots) driven from _updateVisuals().
   _buildMesh() {
     this.group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3f78c9, roughness: 0.5 });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.0, 4, 8), bodyMat);
-    body.position.y = 1.1;
-    body.castShadow = true;
-    this.group.add(body);
-    this.bodyMesh = body;
 
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xe8b98a, roughness: 0.6 });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), headMat);
-    head.position.y = 1.95;
+    const armorMat = new THREE.MeshStandardMaterial({ color: 0x3f78c9, roughness: 0.45, metalness: 0.15 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0x1f3a5c, roughness: 0.5, metalness: 0.2 });
+    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x2b2f38, roughness: 0.7 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xe8b98a, roughness: 0.6 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x5b3a29, roughness: 0.7 });
+    const capeMat = new THREE.MeshStandardMaterial({ color: 0xb8302f, roughness: 0.8, side: THREE.DoubleSide });
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.7, roughness: 0.25 });
+    const hiltMat = new THREE.MeshStandardMaterial({ color: 0x8d6e40, roughness: 0.6 });
+
+    const HIP_Y = 0.9;
+    const SHOULDER_Y = 1.55;
+
+    // --- torso + belt + head (static, non-animated parts) ---
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.7, 0.36), armorMat);
+    torso.position.y = HIP_Y + 0.35;
+    torso.castShadow = true;
+    this.group.add(torso);
+
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.12, 0.4), trimMat);
+    belt.position.y = HIP_Y;
+    this.group.add(belt);
+
+    const pauldronGeo = new THREE.SphereGeometry(0.16, 8, 8);
+    for (const side of [-1, 1]) {
+      const pauldron = new THREE.Mesh(pauldronGeo, trimMat);
+      pauldron.position.set(side * 0.36, SHOULDER_Y + 0.05, 0);
+      pauldron.castShadow = true;
+      this.group.add(pauldron);
+    }
+
+    const headGroup = new THREE.Group();
+    headGroup.position.y = SHOULDER_Y + 0.42;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), skinMat);
     head.castShadow = true;
-    this.group.add(head);
+    headGroup.add(head);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.29, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
+    hair.position.y = 0.05;
+    headGroup.add(hair);
+    this.group.add(headGroup);
+    this.headGroup = headGroup;
 
-    const weaponMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.6, roughness: 0.3 });
-    this.weapon = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.3), weaponMat);
-    this.weapon.position.set(0.55, 1.1, 0.3);
-    this.group.add(this.weapon);
+    // --- cape, hanging from the shoulders ---
+    const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.85, 1, 4), capeMat);
+    cape.position.set(0, SHOULDER_Y - 0.28, -0.2);
+    cape.rotation.x = 0.15;
+    cape.castShadow = true;
+    this.group.add(cape);
+    this.cape = cape;
+
+    // --- legs (each a hip-pivoted group so it can swing for the walk cycle) ---
+    this.legs = [-1, 1].map((side) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.18, HIP_Y, 0);
+      const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.45, 0.26), pantsMat);
+      thigh.position.y = -0.22;
+      thigh.castShadow = true;
+      pivot.add(thigh);
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.34), trimMat);
+      boot.position.set(0, -0.54, 0.04);
+      boot.castShadow = true;
+      pivot.add(boot);
+      this.group.add(pivot);
+      return pivot;
+    });
+
+    // --- arms (shoulder-pivoted groups; right hand carries the sword, left the shield) ---
+    this.arms = [-1, 1].map((side) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.4, SHOULDER_Y, 0);
+      const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.42, 8), armorMat);
+      upperArm.position.y = -0.21;
+      upperArm.castShadow = true;
+      pivot.add(upperArm);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), skinMat);
+      hand.position.y = -0.44;
+      pivot.add(hand);
+      this.group.add(pivot);
+      return pivot;
+    });
+    const [leftArm, rightArm] = this.arms;
+
+    const sword = new THREE.Group();
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.62, 0.02), bladeMat);
+    blade.position.y = 0.31;
+    sword.add(blade);
+    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 6), hiltMat);
+    hilt.rotation.z = Math.PI / 2;
+    sword.add(hilt);
+    sword.position.y = -0.5;
+    sword.rotation.x = -0.15;
+    rightArm.add(sword);
+    this.weapon = sword;
+
+    const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 12), armorMat);
+    shield.rotation.z = Math.PI / 2;
+    shield.position.set(-0.1, -0.44, 0);
+    const shieldRim = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 16), trimMat);
+    shieldRim.rotation.y = Math.PI / 2;
+    shield.add(shieldRim);
+    leftArm.add(shield);
 
     this.group.position.copy(this.position);
     this.scene.add(this.group);
+
+    this._walkPhase = 0;
   }
 
   takeDamage(amount) {
@@ -86,13 +175,45 @@ export class Player {
     this._handleAbilities(dt, input, world);
     this.group.position.copy(this.position);
     this.group.rotation.y = this.facingYaw;
+    this._updateVisuals(dt);
+  }
 
-    // weapon swing animation feedback
+  _updateVisuals(dt) {
+    // weapon swing animation feedback (relative to the arm's own walk-cycle pose)
     if (this._swingTimer > 0) {
       this._swingTimer -= dt;
-      this.weapon.rotation.x = Math.sin((1 - this._swingTimer / 0.22) * Math.PI) * 1.8;
+      this.weapon.rotation.x = -0.15 + Math.sin((1 - this._swingTimer / 0.22) * Math.PI) * 1.8;
     } else {
-      this.weapon.rotation.x = 0;
+      this.weapon.rotation.x = -0.15;
+    }
+
+    // Walk cycle: legs/arms swing from their hip/shoulder pivots while
+    // grounded and moving; airborne poses tuck legs together instead.
+    const [leftLeg, rightLeg] = this.legs;
+    const [leftArm, rightArm] = this.arms;
+    if (!this.grounded) {
+      const t = Math.min(1, Math.abs(this.velocityY) / 8);
+      leftLeg.rotation.x = 0.3 * t;
+      rightLeg.rotation.x = 0.3 * t;
+      leftArm.rotation.x = -0.2;
+      rightArm.rotation.x = -0.2;
+    } else if (this._animMoving) {
+      const cycleSpeed = (this.sprinting ? 11 : 7) + (this.dashing ? 6 : 0);
+      this._walkPhase += dt * cycleSpeed;
+      const swing = Math.sin(this._walkPhase) * (this.sprinting ? 0.75 : 0.55);
+      leftLeg.rotation.x = swing;
+      rightLeg.rotation.x = -swing;
+      leftArm.rotation.x = -swing * 0.7;
+      rightArm.rotation.x = swing * 0.7;
+      this.headGroup.position.y = 1.97 + Math.abs(Math.sin(this._walkPhase)) * 0.02;
+    } else {
+      // idle: ease limbs back to rest and add a slow breathing bob
+      this._walkPhase += dt * 1.6;
+      leftLeg.rotation.x += (0 - leftLeg.rotation.x) * Math.min(1, dt * 8);
+      rightLeg.rotation.x += (0 - rightLeg.rotation.x) * Math.min(1, dt * 8);
+      leftArm.rotation.x += (0 - leftArm.rotation.x) * Math.min(1, dt * 8);
+      rightArm.rotation.x += (0 - rightArm.rotation.x) * Math.min(1, dt * 8);
+      this.headGroup.position.y = 1.97 + Math.sin(this._walkPhase) * 0.008;
     }
   }
 
@@ -114,6 +235,7 @@ export class Player {
     if (this.dashing) {
       this.dashTime -= dt;
       this.position.addScaledVector(this._dashDir, stats.dashSpeed * dt);
+      this._animMoving = true;
       if (this.dashTime <= 0) this.dashing = false;
     } else {
       const move = input.moveVector;
@@ -133,6 +255,7 @@ export class Player {
         this._staminaRegenDelay = 0.6;
       }
       this.position.addScaledVector(moveDir, speed * dt);
+      this._animMoving = moving;
 
       if (moving) {
         this.facingYaw = Math.atan2(moveDir.x, moveDir.z);
