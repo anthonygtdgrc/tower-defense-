@@ -27,32 +27,33 @@ export class Tower {
   _buildMesh() {
     this.group = new THREE.Group();
     this.group.position.copy(this.position);
+
+    const isTrap = this.def.id === 'trap';
+    const pedestalHeight = isTrap ? 0.16 : 0.6;
     const base = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.9, 1.0, 0.6, 8),
+      new THREE.CylinderGeometry(0.9, 1.0, pedestalHeight, 8),
       new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 })
     );
-    base.position.y = 0.3;
+    base.position.y = pedestalHeight / 2;
     base.castShadow = true;
     base.receiveShadow = true;
     this.group.add(base);
 
-    const bodyGeo = this.def.id === 'support'
-      ? new THREE.OctahedronGeometry(0.6, 0)
-      : new THREE.BoxGeometry(0.7, 1.1, 0.7);
     this.bodyMat = new THREE.MeshStandardMaterial({ color: this.def.color, roughness: 0.5, metalness: 0.2 });
-    this.body = new THREE.Mesh(bodyGeo, this.bodyMat);
-    this.body.position.y = 1.0;
-    this.body.castShadow = true;
+    this.body = new THREE.Group();
+    this.body.position.y = pedestalHeight;
     this.group.add(this.body);
 
-    const barrelGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.9, 6);
-    this.barrel = new THREE.Mesh(barrelGeo, this.bodyMat);
-    this.barrel.rotation.x = Math.PI / 2;
-    this.barrel.position.set(0, 0, 0.5);
-    this.body.add(this.barrel); // child of body so it turns together when facing a target
+    // Muzzle anchor: a logical (invisible) point at the "front" of whatever
+    // shape this tower type has, used for projectile spawn / facing math.
+    // Decorative geometry below is purely visual and type-specific.
+    this.barrel = new THREE.Object3D();
+    this._decor = [];
+    this._buildTypeDecor();
+    this.body.add(this.barrel);
 
     this._levelPips = new THREE.Group();
-    this._levelPips.position.y = 1.9;
+    this._levelPips.position.y = 1.5;
     this.group.add(this._levelPips);
     this._refreshLevelPips();
 
@@ -67,7 +68,7 @@ export class Tower {
     const fg = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.1), new THREE.MeshBasicMaterial({ color: 0x42a5f5, depthTest: false }));
     fg.position.z = 0.01;
     barGroup.add(bg, fg);
-    barGroup.position.y = 2.3;
+    barGroup.position.y = 1.9;
     barGroup.visible = false;
     this.group.add(barGroup);
     this._healthBar = { group: barGroup, fg };
@@ -83,11 +84,105 @@ export class Tower {
     this.group.add(this.rangeRing);
 
     if (this.def.invisible) {
-      this.body.material.transparent = true;
-      this.body.material.opacity = 0.4;
+      this.bodyMat.transparent = true;
+      this.bodyMat.opacity = 0.4;
     }
 
     this.scene.add(this.group);
+  }
+
+  // Type-specific decorative geometry, built into `this.body` (a Group that
+  // rotates as a whole to face the current target). Each type also positions
+  // `this.barrel`, the invisible anchor projectiles spawn from.
+  _buildTypeDecor() {
+    const mat = this.bodyMat;
+    const add = (mesh, castShadow = true) => {
+      mesh.castShadow = castShadow;
+      this.body.add(mesh);
+      this._decor.push(mesh);
+      return mesh;
+    };
+
+    switch (this.def.id) {
+      case 'ballistic': {
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.4, 0.55), mat)).position.y = 0.2;
+        for (const side of [-1, 1]) {
+          const gun = add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.7, 8), mat));
+          gun.rotation.x = Math.PI / 2;
+          gun.position.set(side * 0.13, 0.22, 0.45);
+        }
+        this.barrel.position.set(0, 0.22, 0.8);
+        break;
+      }
+      case 'mage': {
+        const spire = add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.32, 1.0, 8), mat));
+        spire.position.y = 0.5;
+        const orbMat = new THREE.MeshStandardMaterial({ color: 0xd7b8ff, emissive: 0x7c5cff, emissiveIntensity: 0.9, roughness: 0.2, metalness: 0.1 });
+        const orb = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), orbMat), false);
+        orb.position.y = 1.15;
+        this._decorSpin = orb;
+        this.barrel.position.set(0, 1.15, 0.3);
+        break;
+      }
+      case 'aoe': {
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.3, 10), mat)).position.y = 0.15;
+        const tube = add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.21, 0.85, 10), mat));
+        tube.position.set(0, 0.55, 0.18);
+        tube.rotation.x = -0.85;
+        this.barrel.position.set(0, 0.85, 0.55);
+        break;
+      }
+      case 'support': {
+        const core = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), mat));
+        core.position.y = 0.4;
+        const haloMat = new THREE.MeshStandardMaterial({ color: 0xffe082, emissive: 0xffc107, emissiveIntensity: 0.8, roughness: 0.3, metalness: 0.4 });
+        const halo = add(new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.035, 8, 24), haloMat), false);
+        halo.rotation.x = Math.PI / 2;
+        halo.position.y = 0.4;
+        this._decorSpin = halo;
+        this.barrel.position.set(0, 0.4, 0.3);
+        break;
+      }
+      case 'control': {
+        const shardGeo = (h) => new THREE.ConeGeometry(0.14, h, 6);
+        const iceMat = new THREE.MeshStandardMaterial({ color: this.def.color, emissive: 0x1a6f8a, emissiveIntensity: 0.4, roughness: 0.15, metalness: 0.3 });
+        add(new THREE.Mesh(shardGeo(0.9), iceMat)).position.set(0, 0.45, 0);
+        add(new THREE.Mesh(shardGeo(0.55), iceMat)).position.set(0.22, 0.28, 0.1);
+        add(new THREE.Mesh(shardGeo(0.5), iceMat)).position.set(-0.2, 0.25, -0.08);
+        this.barrel.position.set(0, 0.9, 0.15);
+        break;
+      }
+      case 'antiair': {
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), mat)).position.y = 0.18;
+        for (const side of [-1, 1]) {
+          const gun = add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.6, 8), mat));
+          gun.position.set(side * 0.16, 0.42, 0.12);
+          gun.rotation.x = -0.9;
+          gun.rotation.z = side * 0.15;
+        }
+        const dishMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.5, roughness: 0.4 });
+        const dish = add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 12), dishMat));
+        dish.position.y = 0.55;
+        this._decorSpin = dish;
+        this.barrel.position.set(0, 0.5, 0.5);
+        break;
+      }
+      case 'trap': {
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 8), mat)).position.y = 0.03;
+        const spikeGeo = new THREE.ConeGeometry(0.05, 0.16, 5);
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2;
+          const spike = add(new THREE.Mesh(spikeGeo, mat));
+          spike.position.set(Math.cos(angle) * 0.28, 0.1, Math.sin(angle) * 0.28);
+        }
+        this.barrel.position.set(0, 0.1, 0);
+        break;
+      }
+      default: {
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.7), mat)).position.y = 0.55;
+        this.barrel.position.set(0, 0.55, 0.5);
+      }
+    }
   }
 
   _refreshLevelPips() {
@@ -207,6 +302,12 @@ export class Tower {
 
   setSelected(selected) {
     this.rangeRing.visible = selected;
+  }
+
+  // Idle decoration (orbiting orb / spinning halo / radar dish) — purely
+  // cosmetic, independent of facing/targeting.
+  updateDecor(dt) {
+    if (this._decorSpin) this._decorSpin.rotation.y += dt * 1.4;
   }
 
   faceTarget(targetPos) {

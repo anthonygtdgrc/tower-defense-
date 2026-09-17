@@ -48,17 +48,22 @@ n'importe quel serveur statique).
 
 ## Systèmes implémentés
 
-- **Personnage jouable** : déplacement relatif à la caméra, saut, sprint avec
-  jauge d'endurance, dash avec i-frames, combat au corps-à-corps et à
-  distance, 4 compétences actives avec cooldowns, XP/niveaux, arbre de
-  compétences à 3 branches (Combat rapproché / Magie à distance /
-  Soutien-Ingénieur), équipement (arme/armure) avec raretés et stats
+- **Personnage jouable** : modèle 3D articulé (cape, épaulières, épée +
+  bouclier, cycle de marche animé) plutôt qu'une simple capsule, déplacement
+  relatif à la caméra, saut, sprint avec jauge d'endurance, dash avec
+  i-frames, combat au corps-à-corps et à distance, 4 compétences actives
+  avec cooldowns, XP/niveaux, arbre de compétences à 3 branches (Combat
+  rapproché / Magie à distance / Soutien-Ingénieur), équipement (arme/armure)
+  avec raretés et stats
   aléatoires.
-- **Tours** : 7 types (balistique, mage, zone, soutien, contrôle, anti-aérien,
-  piège), placement avec preview fantôme et vérification A* garantissant
-  qu'un chemin reste toujours ouvert, 5 niveaux avec spécialisation au
-  niveau 3, fusion de 3 tours niveau max en version hybride, réparation,
-  modes de ciblage (plus proche/premier/dernier/plus de vie).
+- **Tours** : 7 types, chacun avec un modèle 3D distinct (tourelle à double
+  canon, spire arcanique surmontée d'un orbe flottant, mortier incliné,
+  balise à halo tournant, amas de cristaux de glace, flak à radar rotatif,
+  plaque-piège discrète au sol), placement avec preview fantôme et
+  vérification A* garantissant qu'un chemin reste toujours ouvert, 5 niveaux
+  avec spécialisation au niveau 3, fusion de 3 tours niveau max en version
+  hybride, réparation, modes de ciblage (plus proche/premier/dernier/plus de
+  vie).
 - **Runes** : emplacements débloqués progressivement avec le niveau de la
   tour (1 au niveau 2, 2 au niveau 3, 3 au niveau max), 9 runes réparties en
   4 familles (Puissance, Portée, Cadence, Statuts élémentaires) sur 2 paliers

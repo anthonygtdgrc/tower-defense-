@@ -179,6 +179,7 @@ export class TowerManager {
     const auraMap = this._computeAuras();
 
     for (const tower of this.towers) {
+      tower.updateDecor(dt);
       if (tower.hp <= 0) continue;
       if (tower.def.id === 'support') continue; // support towers don't attack
       const aura = { ...(auraMap.get(tower.id) || {}) };
