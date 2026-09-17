@@ -18,12 +18,6 @@ import { TOWER_LIST } from './data/towers.js';
 import { XP_PER_LEVEL } from './data/skills.js';
 import { getDifficultyMods, getRunModifierEffects } from './systems/MetaProgression.js';
 
-const RUNES = [
-  { id: 'rune_power', name: 'Rune de Puissance', cost: 3, damageMult: 1.18 },
-  { id: 'rune_reach', name: 'Rune de Portée', cost: 2, rangeMult: 1.15 },
-  { id: 'rune_frost', name: 'Rune de Givre', cost: 4, status: 'freeze' }
-];
-
 export class Game {
   constructor({ canvas, hudRoot, menuRoot, saveManager, metaProgression, config }) {
     this.canvas = canvas;
@@ -188,6 +182,7 @@ export class Game {
       if (e.code === 'Tab') e.preventDefault();
       if (e.code === 'Escape') {
         if (this.buildType) this._selectBuildType(null);
+        else if (this.selectedTower) this._closeTowerPanel();
         else this._togglePause();
       }
       if (e.code === 'KeyK' && !this.gameOver) this._toggleModal('skill-modal', () => this.modals.renderSkillTree(this.progression, (id) => this.progression.allocate(id)));
@@ -288,9 +283,19 @@ export class Game {
 
   _openTowerPanel(tower) {
     this.selectedTower = tower;
+    this._runeOffer = null;
+    this._runeOfferTower = null;
     for (const t of this.towerManager.towers) t.setSelected(t === tower);
     this._renderTowerPanel();
     document.exitPointerLock?.();
+  }
+
+  _closeTowerPanel() {
+    if (this.selectedTower) this.selectedTower.setSelected(false);
+    this.selectedTower = null;
+    this._runeOffer = null;
+    this._runeOfferTower = null;
+    this.hud.hideTowerPanel();
   }
 
   _renderTowerPanel() {
@@ -321,7 +326,6 @@ export class Game {
 
     html += `<div class="tower-panel-actions">
       ${tower.canUpgrade() ? `<button data-action="upgrade" class="primary">Améliorer (${upgradeCostVal}🪙)</button>` : '<button disabled>Niveau Max</button>'}
-      <button data-action="rune" ${this.economy.crystals < 3 ? 'disabled' : ''}>Rune (3💎)</button>
       <button data-action="sell" class="danger">Vendre</button>
       <button data-action="close">Fermer</button>
     </div>`;
@@ -330,23 +334,65 @@ export class Game {
       html += `<div class="tower-panel-actions"><button data-action="fuse" class="primary">✨ Fusionner 3 tours Nv.5 (${tower.def.name})</button></div>`;
     }
 
+    html += this._runesPanelHtml(tower);
+
     this.hud.showTowerPanel(html);
     const panel = this.hud.el.towerPanel;
     panel.querySelector('#targeting-select')?.addEventListener('change', (e) => { tower.targetingMode = e.target.value; });
     panel.querySelector('[data-action="upgrade"]')?.addEventListener('click', () => { this.towerManager.upgrade(tower, this.progression.getStats().towerCostMult); this._renderTowerPanel(); });
     panel.querySelector('[data-action="sell"]')?.addEventListener('click', () => { this.towerManager.sell(tower); this.selectedTower = null; this.hud.hideTowerPanel(); });
-    panel.querySelector('[data-action="close"]')?.addEventListener('click', () => { tower.setSelected(false); this.selectedTower = null; this.hud.hideTowerPanel(); });
+    panel.querySelector('[data-action="close"]')?.addEventListener('click', () => this._closeTowerPanel());
     panel.querySelector('[data-action="spec-a"]')?.addEventListener('click', () => { this.towerManager.specialize(tower, 'A'); this._renderTowerPanel(); });
     panel.querySelector('[data-action="spec-b"]')?.addEventListener('click', () => { this.towerManager.specialize(tower, 'B'); this._renderTowerPanel(); });
     panel.querySelector('[data-action="fuse"]')?.addEventListener('click', () => { this.towerManager.fuse(tower.typeId); this.selectedTower = null; this.hud.hideTowerPanel(); });
-    panel.querySelector('[data-action="rune"]')?.addEventListener('click', () => {
-      if (this.economy.spendCrystals(3)) {
-        const rune = RUNES[Math.floor(Math.random() * RUNES.length)];
-        this.towerManager.insertRune(tower, rune);
-        this.hud.notify(`${rune.name} ajoutée à ${tower.def.name}`, 'good');
-        this._renderTowerPanel();
-      }
+    panel.querySelector('[data-action="rune-offer"]')?.addEventListener('click', () => {
+      this._runeOffer = this.towerManager.getRuneOffer(tower);
+      this._runeOfferTower = tower;
+      this._renderTowerPanel();
     });
+    panel.querySelectorAll('[data-action="rune-pick"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const rune = this._runeOffer[Number(btn.dataset.index)];
+        if (this.towerManager.addRune(tower, rune)) {
+          this.hud.notify(`${rune.name} ajoutée à ${tower.def.name}`, 'good');
+          this._runeOffer = null;
+          this._renderTowerPanel();
+        }
+      });
+    });
+    panel.querySelectorAll('[data-action="rune-remove"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.towerManager.removeRune(tower, Number(btn.dataset.index));
+        this._renderTowerPanel();
+      });
+    });
+  }
+
+  _runesPanelHtml(tower) {
+    const maxSlots = tower.maxRuneSlots();
+    if (maxSlots === 0) {
+      return `<div class="tower-panel-row"><span>Runes</span><span>Niveau 2+ requis</span></div>`;
+    }
+    let html = `<div class="tower-panel-row"><span>Runes</span><span>${tower.runes.length}/${maxSlots}</span></div>`;
+    tower.runes.forEach((rune, i) => {
+      html += `<div class="rune-row">
+        <span class="rune-dot" style="background:#${rune.color.toString(16).padStart(6, '0')}"></span>
+        <span>${rune.name}</span>
+        <button data-action="rune-remove" data-index="${i}">Retirer</button>
+      </div>`;
+    });
+    if (tower.runes.length < maxSlots) {
+      if (this._runeOffer && this._runeOfferTower === tower) {
+        html += `<div class="rune-offer">` + this._runeOffer.map((rune, i) => `
+          <button data-action="rune-pick" data-index="${i}" ${this.economy.crystals < rune.cost ? 'disabled' : ''}>
+            <span class="rune-dot" style="background:#${rune.color.toString(16).padStart(6, '0')}"></span>
+            ${rune.name}<br/><small>${rune.cost}💎</small>
+          </button>`).join('') + `</div>`;
+      } else {
+        html += `<div class="tower-panel-actions"><button data-action="rune-offer">Choisir une Rune</button></div>`;
+      }
+    }
+    return html;
   }
 
   // ---- core gameplay callbacks shared by player / towers / bosses ----

@@ -142,6 +142,19 @@ html, body, #app {
 .tower-panel-actions button.danger { background: var(--danger); color: #200; }
 select.targeting-select { width: 100%; padding: 4px; border-radius: 4px; background: #12161e; color: #e6edf3; border: 1px solid var(--panel-border); }
 
+.rune-row { display: flex; align-items: center; gap: 6px; font-size: 11px; background: rgba(255,255,255,0.04); border-radius: 6px; padding: 4px 8px; }
+.rune-row span:nth-child(2) { flex: 1; }
+.rune-row button { padding: 3px 8px; border: none; border-radius: 5px; background: rgba(239,83,80,0.25); color: #ffb4b0; cursor: pointer; font-size: 10px; }
+.rune-row button:hover { background: rgba(239,83,80,0.4); }
+.rune-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 4px currentColor; }
+.rune-offer { display: flex; gap: 6px; margin-top: 4px; }
+.rune-offer button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border: 1px solid var(--panel-border);
+  border-radius: 6px; background: rgba(255,255,255,0.06); color: #e6edf3; cursor: pointer; font-size: 10px; text-align: center;
+}
+.rune-offer button:hover { background: rgba(255,255,255,0.14); }
+.rune-offer button:disabled { opacity: 0.4; cursor: not-allowed; }
+
 #interact-prompt {
   position: absolute; left: 50%; bottom: 200px; transform: translateX(-50%);
   padding: 6px 14px; font-size: 12px; display: none;

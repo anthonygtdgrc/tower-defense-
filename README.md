@@ -58,7 +58,14 @@ n'importe quel serveur statique).
   piège), placement avec preview fantôme et vérification A* garantissant
   qu'un chemin reste toujours ouvert, 5 niveaux avec spécialisation au
   niveau 3, fusion de 3 tours niveau max en version hybride, réparation,
-  runes, modes de ciblage (plus proche/premier/dernier/plus de vie).
+  modes de ciblage (plus proche/premier/dernier/plus de vie).
+- **Runes** : emplacements débloqués progressivement avec le niveau de la
+  tour (1 au niveau 2, 2 au niveau 3, 3 au niveau max), 9 runes réparties en
+  4 familles (Puissance, Portée, Cadence, Statuts élémentaires) sur 2 paliers
+  de puissance. Ajouter une rune propose un choix de 3 runes aléatoires
+  payées en cristaux — une vraie décision plutôt qu'un tirage aléatoire subi
+  — et chaque rune équipée s'affiche visuellement (gemme colorée) sur la
+  tour. Les runes sont retirables (sans remboursement).
 - **Vagues** : courbe de difficulté non linéaire avec paliers, vagues élites
   tous les 5 niveaux (modificateurs aléatoires), vagues de boss tous les 10
   niveaux (plusieurs phases, attaque téléguidée interceptible en infligeant
@@ -115,8 +122,9 @@ simplifiés :
 - **Pas d'objets destructibles au sol** distincts des ennemis (l'or provient
   des kills, des vagues et des intérêts, comme indiqué dans le cahier des
   charges, mais pas d'obstacles destructibles séparés).
-- **Runes/gemmes** : système simplifié (3 runes de base ajoutables contre
-  cristaux) plutôt qu'un système de gemmes complet à combinaisons.
+- **Runes/gemmes** : 9 runes sur 4 familles avec choix stratégique et
+  emplacements limités (voir plus haut), mais pas de système de combinaisons
+  entre runes (fusionner deux runes en une variante unique, par exemple).
 - **Assets** : géométries procédurales colorées (pas de modèles 3D texturés)
   et SFX synthétisés au lieu de samples audio — cohérent avec un projet code
   sans pipeline d'art, mais visuellement minimaliste.
