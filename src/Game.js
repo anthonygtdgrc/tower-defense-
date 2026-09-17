@@ -437,6 +437,22 @@ export class Game {
   spawnRingEffect(pos, radius, color) { this.vfx.ring(pos, radius, color); }
   applyOvercharge(tower, duration, mult) { this.towerManager.applyOvercharge(tower, duration, mult); }
 
+  // Enemies within `r` of `pos`, measured to each enemy's center of mass
+  // rather than its ground-level anchor position. Projectiles (see
+  // Projectile._updateDirection) home in on that same center point, so hit
+  // detection has to use it too — comparing against ground-level position
+  // left a gap equal to half the enemy's hitbox height (0.7+ units) that a
+  // perfectly-homed projectile could never close, causing shots to expire
+  // just short of the target instead of ever registering a hit.
+  _enemiesNear(pos, r) {
+    return this.enemies.filter((e) => {
+      if (e.dead) return false;
+      const center = e.position.clone();
+      center.y += (e.hitboxHeight ?? 1.4) * 0.5;
+      return center.distanceTo(pos) <= r;
+    });
+  }
+
   // ---- main loop ----
 
   start() {
@@ -544,9 +560,9 @@ export class Game {
     this._processMeleeContactDamage(dt);
     this._processKamikaze();
 
-    this.towerManager.update(dt, { enemies: this.enemies, projectiles: this.projectiles, findSplashTargets: (pos, r) => this.enemies.filter((e) => !e.dead && e.position.distanceTo(pos) <= r) });
+    const enemiesNear = (pos, r) => this._enemiesNear(pos, r);
+    this.towerManager.update(dt, { enemies: this.enemies, projectiles: this.projectiles, findSplashTargets: enemiesNear });
 
-    const enemiesNear = (pos, r) => this.enemies.filter((e) => !e.dead && e.position.distanceTo(pos) <= r);
     for (const proj of this.projectiles) {
       proj.update(dt, {
         onHit: (target, p, isSplash) => {
