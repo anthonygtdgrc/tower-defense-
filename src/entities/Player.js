@@ -223,9 +223,11 @@ export class Player {
   }
 
   _handleAbilities(dt, input, world) {
-    const map = { KeyA: 'a', KeyE: 'e', KeyR: 'r', KeyF: 'f' };
-    for (const [code, slot] of Object.entries(map)) {
-      if (input.wasPressed(code) && this.cooldowns[slot] <= 0) {
+    // Label-based (event.key: 'a','e','r','f') rather than physical-position
+    // codes, so this follows the actual A/E/R/F keycaps regardless of the
+    // keyboard layout — unlike ZQSD movement, these aren't finger-position bindings.
+    for (const slot of ['a', 'e', 'r', 'f']) {
+      if (input.wasPressedKey(slot) && this.cooldowns[slot] <= 0) {
         this._castAbility(slot, world);
       }
     }

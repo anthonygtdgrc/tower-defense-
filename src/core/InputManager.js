@@ -1,12 +1,25 @@
 // Keyboard/mouse input for AZERTY (ZQSD) controls + camera look + build hotkeys.
+//
+// KeyboardEvent.code names a key by its PHYSICAL position, always using the
+// US-QWERTY reference layout — it is not affected by the keyboard's actual
+// layout. On real AZERTY hardware the key printed "Z" sits where QWERTY has
+// "W", and the key printed "Q" sits where QWERTY has "A" (S and D are in the
+// same spot on both layouts). So to react to the AZERTY-labelled Z/Q keys we
+// must check codes 'KeyW'/'KeyA', not 'KeyZ'/'KeyQ' — checking the latter
+// actually catches whatever is physically where W/A are on the *layout in
+// use*, which on AZERTY is nothing a ZQSD player would press for movement.
+const MOVE_CODES = { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD' };
+
 export class InputManager {
   constructor(domElement) {
     this.dom = domElement;
     this.keys = new Set();
     this.justPressed = new Set();
+    this.keysChar = new Set();
+    this.justPressedChar = new Set();
     this.mouse = { dx: 0, dy: 0, x: 0, y: 0, leftDown: false, rightDown: false, wheel: 0, leftJustPressed: false, rightJustPressed: false };
     this.pointerLocked = false;
-    this._lastTapTime = { KeyZ: 0, KeyQ: 0, KeyS: 0, KeyD: 0 };
+    this._lastTapTime = {};
     this.doubleTapDash = null;
 
     window.addEventListener('keydown', (e) => this._onKeyDown(e));
@@ -28,7 +41,17 @@ export class InputManager {
   _onKeyDown(e) {
     if (!this.keys.has(e.code)) this.justPressed.add(e.code);
     this.keys.add(e.code);
-    if (['KeyZ', 'KeyQ', 'KeyS', 'KeyD'].includes(e.code)) {
+    // Letter-label tracking (event.key), separate from the physical-position
+    // tracking above (event.code): used for bindings like the A/E/R/F
+    // abilities, which should follow whatever the keycap actually reads
+    // regardless of physical position — unlike ZQSD movement, these aren't
+    // meant to be "the same finger position as an English layout".
+    if (e.key && e.key.length === 1) {
+      const char = e.key.toLowerCase();
+      if (!this.keysChar.has(char)) this.justPressedChar.add(char);
+      this.keysChar.add(char);
+    }
+    if (Object.values(MOVE_CODES).includes(e.code)) {
       const now = performance.now();
       const last = this._lastTapTime[e.code] || 0;
       if (now - last < 300) {
@@ -37,7 +60,10 @@ export class InputManager {
       this._lastTapTime[e.code] = now;
     }
   }
-  _onKeyUp(e) { this.keys.delete(e.code); }
+  _onKeyUp(e) {
+    this.keys.delete(e.code);
+    if (e.key && e.key.length === 1) this.keysChar.delete(e.key.toLowerCase());
+  }
   _onMouseDown(e) {
     if (e.button === 0) { this.mouse.leftDown = true; this.mouse.leftJustPressed = true; }
     if (e.button === 2) { this.mouse.rightDown = true; this.mouse.rightJustPressed = true; }
@@ -62,9 +88,13 @@ export class InputManager {
 
   isDown(code) { return this.keys.has(code); }
   wasPressed(code) { return this.justPressed.has(code); }
+  // Label-based: fires for whatever the keycap actually reads (e.g. 'a'),
+  // independent of physical position/layout. Use for A/E/R/F-style bindings.
+  wasPressedKey(char) { return this.justPressedChar.has(char.toLowerCase()); }
 
   consumeFrame() {
     this.justPressed.clear();
+    this.justPressedChar.clear();
     this.mouse.dx = 0;
     this.mouse.dy = 0;
     this.mouse.wheel = 0;
@@ -75,10 +105,10 @@ export class InputManager {
 
   get moveVector() {
     let x = 0, z = 0;
-    if (this.isDown('KeyZ')) z -= 1;
-    if (this.isDown('KeyS')) z += 1;
-    if (this.isDown('KeyQ')) x -= 1;
-    if (this.isDown('KeyD')) x += 1;
+    if (this.isDown(MOVE_CODES.forward)) z -= 1;
+    if (this.isDown(MOVE_CODES.back)) z += 1;
+    if (this.isDown(MOVE_CODES.left)) x -= 1;
+    if (this.isDown(MOVE_CODES.right)) x += 1;
     return { x, z };
   }
 }
